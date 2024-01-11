@@ -1,0 +1,50 @@
+name: GitHub2Gitea 
+on:
+  #workflow_call:
+  push:
+    branches:
+    - 'master'
+  schedule:
+    # Execute on schedule
+    - cron: '0 5 */7 * *'
+    
+env:
+  # The name of the user in whose profile the repositories will be created. Leave blank to use the name from github.
+  # GITEA_USER: XXXX-github
+  # Gitea server address
+  GITEA_URL: https://XXXXX
+
+  # Token owner name
+  GITHUB_USER: XXXX
+  # Usernames to clone (Use space as delimiter)
+  GITHUB_USE: "XXXX"
+  # Organization to clone (Use space as delimiter)
+  GITHUB_ORG: "XXXX XXXX"
+
+# don't forget to create secrets. API_GT, API_GH
+jobs:
+  GitHub2Gitea:
+    name: Run GitHub2Gitea
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install tools
+        run: |
+          apt update
+          apt install -y jq                  
+      - name: Clone organization
+        run: |
+          export ACCESS_TOKEN=${{ secrets.API_GT }}
+          export GITHUB_TOKEN=${{ secrets.API_GH }}
+          for org in `echo "$GITHUB_ORG" | sed "s/ /\n/g"`; do \
+            echo "Clone organization"
+            ./github2gitea-mirror -m org -o ${org} -u $GITHUB_USER -v private; \
+          done          
+      - name: Clone user
+        run: |
+          export ACCESS_TOKEN=${{ secrets.API_GT }}
+          export GITHUB_TOKEN=${{ secrets.API_GH }}
+          for user in `echo "$GITHUB_USE" | sed "s/ /\n/g"`; do \
+            echo "Clone user"
+            ./github2gitea-mirror -m user -u $user; \
+          done          
