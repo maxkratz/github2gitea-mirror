@@ -23,6 +23,7 @@ First, setup your environment variables like this:
 export ACCESS_TOKEN=123
 export GITEA_URL=https://gitea.example.com
 export GITHUB_TOKEN=456
+export GITEA_USER=789
 ```
 
 There are four modes of operation, which the script can print out to the console:
