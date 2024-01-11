@@ -17,6 +17,7 @@
 #   ACCESS_TOKEN = Gitea token
 #   GITERA_URL   = Gitea URL
 #   GITHUB_TOKEN = GitHub personal access token
+#   GITEA_USER   = Which user creates the repository
 
 # Displays the given input including "=> " on the console.
 log () {
@@ -114,7 +115,11 @@ set_uid() {
 
 # Sets the uid to the specified Gitea user
 set_uid_user() {
-    uid=$($CURL "${header_options[@]}" $GITEA_URL/api/v1/users/${github_user} | jq .id)
+    if [[ -z "${GITEA_USER}" ]]; then
+        uid=$($CURL "${header_options[@]}" $GITEA_URL/api/v1/users/${github_user} | jq .id)
+    else
+        uid=$($CURL "${header_options[@]}" $GITEA_URL/api/v1/users/${GITEA_USER} | jq .id)
+    fi  
 }
 
 # Fetches all starred repos of the given user to JSON files
