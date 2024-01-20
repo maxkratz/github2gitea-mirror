@@ -26,6 +26,7 @@ log () {
 CURL="curl -f -S -s"
 
 # Check for correctly set ENVs
+# TODO: GITEA_URL_SRC is also necessary
 # ACCESS_TOKEN_TRG and GITEA_URL_TRG are always necessary
 if [[ -z "${ACCESS_TOKEN_TRG}" || -z "${GITEA_URL_TRG}" ]]; then
     echo -e "Please set the Gitea access token and URL in environment:\nexport ACCESS_TOKEN_TRG=abc\nexport GITEA_URL_TRG=http://gitea:3000\n" >&2
@@ -42,7 +43,7 @@ while [[ "$#" -gt 0 ]]; do
 	case $1 in
 		-m|--mode) mode="$2"; shift ;;
 		-o|--org) gitea_organization="$2"; shift ;;
-        -u|--user) github_user="$2"; shift ;;
+        -u|--user) gitea_user="$2"; shift ;;
         -v|--visibility) visibility="$2"; shift ;;
         -r|--repo) repo="$2"; shift ;;
 		*) log "Unknown parameter passed: $1"; exit 1 ;;
@@ -55,7 +56,7 @@ fail_print_usage () {
     echo -e "Usage: $0"
     echo -e "   -m, --mode {org,repo,user}           Mode to use; either mirror an organization or an user."
     echo -e "   -o, --org \$organization             Gitea organization to mirror and/or the target organization in Gitea."
-    echo -e "   -u, --user \$github_user             Gitea user to gather the repositories from."
+    echo -e "   -u, --user \$gitea_user              Gitea user to gather the repositories from."
     echo -e "   -v, --visibility {public,private}    Visibility for the created Gitea organization."
     echo -e "   -r, --repo \$repo_url                Gitea URL of a single repo to create a mirror for."
     echo "" >&2
@@ -79,13 +80,13 @@ if [ "${mode}" == "org" ]; then
         fail_print_usage
     fi
 elif [ "${mode}" == "repo" ]; then
-    if [[ -z "${repo}" || -z "${github_user}" ]]; then
-        echo -e "Repo URL or GitHub user not set."
+    if [[ -z "${repo}" || -z "${gitea_user}" ]]; then
+        echo -e "Repo URL or Gitea user not set."
         fail_print_usage
     fi
 elif [ "${mode}" == "user" ]; then
-    if [[ -z "${github_user}" ]]; then
-        echo -e "GitHub user not set."
+    if [[ -z "${gitea_user}" ]]; then
+        echo -e "Gitea user not set."
         fail_print_usage
     fi  
 else
@@ -97,23 +98,26 @@ fi
 #set -euo pipefail
 set -eu pipefail
 
-header_options=(-H  "Authorization: Bearer ${ACCESS_TOKEN_TRG}" -H "accept: application/json" -H "Content-Type: application/json")
+header_options_trg=(-H  "Authorization: Bearer ${ACCESS_TOKEN_TRG}" -H "accept: application/json" -H "Content-Type: application/json")
+header_options_src=(-H  "Authorization: Bearer ${ACCESS_TOKEN_SRC}" -H "accept: application/json" -H "Content-Type: application/json")
 jsonoutput=$(mktemp -d -t gitea-repos-XXXXXXXX)
 
-trap "rm -rf ${jsonoutput}" EXIT
+#trap "rm -rf ${jsonoutput}" EXIT
+# TODO
 
 # Sets the uid to the specified Gitea organization
 set_uid() {
-    uid=$($CURL "${header_options[@]}" $GITEA_URL_TRG/api/v1/orgs/${gitea_organization} | jq .id)
+    uid=$($CURL "${header_options_trg[@]}" $GITEA_URL_TRG/api/v1/orgs/${gitea_organization} | jq .id)
 }
 
 # Sets the uid to the specified Gitea user
 set_uid_user() {
-    uid=$($CURL "${header_options[@]}" $GITEA_URL_TRG/api/v1/users/${github_user} | jq .id)
+    uid=$($CURL "${header_options_trg[@]}" $GITEA_URL_TRG/api/v1/users/${gitea_user} | jq .id)
 }
 
-# Fetches all public/private repos of the given GitHub organization to JSON files
+# Fetches all public/private repos of the given Gitea organization to JSON files
 fetch_orga_repos() {
+    # TODO
     log "Fetch organization repos."
     i=1
     # GitHub API just returns empty arrays instead of 404
@@ -123,19 +127,29 @@ fetch_orga_repos() {
     done
 }
 
-# Fetches all public/private repos of the given GitHub user to JSON files
+# Fetches all public/private repos of the given Gitea user to JSON files
 fetch_user_repos() {
+    # TODO
     log "Fetch user repos."
-    i=1
+    # i=1
     # GitHub API just returns empty arrays instead of 404
-    while $CURL "https://api.github.com/user/repos?affiliation=owner&page=${i}&per_page=100" -u "${github_user}:${GITHUB_TOKEN}" >${jsonoutput}/${i}.json \
-	    && (( $(jq <${jsonoutput}/${i}.json '. | length') > 0 )) ; do
-	    (( i++ ))
-    done
+    # while $CURL "https://api.github.com/user/repos?affiliation=owner&page=${i}&per_page=100" -u "${github_user}:${GITHUB_TOKEN}" >${jsonoutput}/${i}.json \
+	#     && (( $(jq <${jsonoutput}/${i}.json '. | length') > 0 )) ; do
+	#     (( i++ ))
+    # done
+
+#    $CURL -w  "%{http_code}\n"  "${header_options_src[@]}" -d @- -X GET $GITEA_URL_SRC/api/v1/user/repos
+    mkdir -p $jsonoutput
+    # touch $jsonoutput/1.json
+    $CURL "${header_options_src[@]}" -X GET $GITEA_URL_SRC/api/v1/user/repos >$jsonoutput/1.json
+
+    # TODO
+    # exit 1
 }
 
-# Fetches one public/private GitHub repo to a JSON file
+# Fetches one public/private Gitea repo to a JSON file
 fetch_one_repo() {
+    # TODO
     log "Fetch one repo."
     # Remove URL prefix
     repo=$(echo $repo | sed "s/https:\/\/github.com\///g" | sed "s/.git//g")
@@ -145,7 +159,7 @@ fetch_one_repo() {
 # Creates a specific migration repo on Gitea
 create_migration_repo() {
     log "Create migration repo."
-    if ! $CURL -w  "%{http_code}\n"  "${header_options[@]}" -d @- -X POST $GITEA_URL_TRG/api/v1/repos/migrate > ${jsonoutput}/result.txt 2>${jsonoutput}/stderr.txt; then
+    if ! $CURL -w  "%{http_code}\n"  "${header_options_trg[@]}" -d @- -X POST $GITEA_URL_TRG/api/v1/repos/migrate > ${jsonoutput}/result.txt 2>${jsonoutput}/stderr.txt; then
         local code=$(<${jsonoutput}/result.txt)
         if (( code != 409 ));then # 409 == repo already exits
             cat ${jsonoutput}/stderr.txt >&2
@@ -157,7 +171,7 @@ create_migration_repo() {
 create_migration_orga() {
     visibility="${1:-}"
     log "Create migration orga with name: ${gitea_organization}"
-    if ! $CURL -X POST $GITEA_URL_TRG/api/v1/orgs "${header_options[@]}" --data '{"username": "'"${gitea_organization}"'", "visibility": "'"${visibility}"'"}' > ${jsonoutput}/result.txt 2>${jsonoutput}/stderr.txt; then
+    if ! $CURL -X POST $GITEA_URL_TRG/api/v1/orgs "${header_options_trg[@]}" --data '{"username": "'"${gitea_organization}"'", "visibility": "'"${visibility}"'"}' > ${jsonoutput}/result.txt 2>${jsonoutput}/stderr.txt; then
         local code=$(<${jsonoutput}/result.txt)
         if (( code != 422 ));then # 422 == orga already exits
             cat ${jsonoutput}/stderr.txt >&2
@@ -165,41 +179,45 @@ create_migration_orga() {
     fi
 }
 
-# Creates a migration repo on Gitea for each GitHub repo in the JSON files
+# Creates a migration repo on Gitea for each Gitea repo in the JSON files
 repos_to_migration() {
+    # TODO
     log "Repos to migration started."
-    for f in ${jsonoutput}/*.json; do
-        n=$(jq '. | length'<$f)
-        if [[ "${n}" -gt "0" ]]; then
-            (( n-- )) # last element
-        else
-            continue;
-        fi
-        for i in $(seq 0 $n); do
-            mig_data=$(jq ".[$i] | .uid=${uid} | \
-                if(.visibility==\"private\") then .private=true else .private=false end |\
-                if(.visibility==\"private\") then .auth_username=\"${github_user}\" else . end | \
-                if(.visibility==\"private\") then .auth_password=\"${GITHUB_TOKEN}\" else . end | \
-                .mirror=true | \
-                .clone_addr=.clone_url | \
-                .description=.description[0:255] | \
-                .repo_name=.name | \
-                {uid,repo_name,clone_addr,description,mirror,private,auth_username,auth_password}" <$f)
-            echo "Migrating repo" $(jq ".[$i] | .uid=${uid} | .name" <$f)
-            echo $mig_data | create_migration_repo
-        done
-    done
+    # for f in ${jsonoutput}/*.json; do
+    #     n=$(jq '. | length'<$f)
+    #     if [[ "${n}" -gt "0" ]]; then
+    #         (( n-- )) # last element
+    #     else
+    #         continue;
+    #     fi
+    #     for i in $(seq 0 $n); do
+    #         mig_data=$(jq ".[$i] | .uid=${uid} | \
+    #             if(.visibility==\"private\") then .private=true else .private=false end |\
+    #             if(.visibility==\"private\") then .auth_username=\"${github_user}\" else . end | \
+    #             if(.visibility==\"private\") then .auth_password=\"${GITHUB_TOKEN}\" else . end | \
+    #             .mirror=true | \
+    #             .clone_addr=.clone_url | \
+    #             .description=.description[0:255] | \
+    #             .repo_name=.name | \
+    #             {uid,repo_name,clone_addr,description,mirror,private,auth_username,auth_password}" <$f)
+    #         echo "Migrating repo" $(jq ".[$i] | .uid=${uid} | .name" <$f)
+    #         echo $mig_data | create_migration_repo
+    #     done
+    # done
+
+
 }
 
-# Creates one migration repo on Gitea for the one GitHub repo in '1.json'
+# Creates one migration repo on Gitea for the one Gitea repo in '1.json'
 one_repo_to_migration() {
+    # TODO
     log "One repo to migration started."
     # There should only be one JSON file
     for f in ${jsonoutput}/*.json; do
-        mig_data=$(jq ".repo_owner=\"${github_user}\" | \
+        mig_data=$(jq ".repo_owner=\"${gitea_user}\" | \
             if(.visibility==\"private\") then .private=true else .private=false end |\
-            if(.visibility==\"private\") then .auth_username=\"${github_user}\" else . end | \
-            if(.visibility==\"private\") then .auth_password=\"${GITHUB_TOKEN}\" else . end | \
+            if(.visibility==\"private\") then .auth_username=\"${gitea_user}\" else . end | \
+            if(.visibility==\"private\") then .auth_password=\"${GITEA_TOKEN_SRC}\" else . end | \
             .mirror=true | \
             .clone_addr=.clone_url | \
             .description=.description[0:255] | \
@@ -223,8 +241,10 @@ elif [ "${mode}" == "repo" ]; then
     one_repo_to_migration
 elif [ "${mode}" == "user" ]; then
     log "Mode = user"
-    set_uid_user
+#    set_uid_user
     fetch_user_repos
+    exit 1
+    # TODO
     repos_to_migration
 fi
 
