@@ -196,11 +196,14 @@ repos_to_migration() {
                 if(.visibility==\"private\") then .private=true else .private=false end |\
                 if(.visibility==\"private\") then .auth_username=\"${github_user}\" else . end | \
                 if(.visibility==\"private\") then .auth_password=\"${GITHUB_TOKEN}\" else . end | \
+                .auth_token=\"${GITHUB_TOKEN}\" | \
+                .lfs=true | \
                 .mirror=true | \
+                .wiki=true | \
                 .clone_addr=.clone_url | \
                 .description=.description[0:255] | \
                 .repo_name=.name | \
-                {uid,repo_name,clone_addr,description,mirror,private,auth_username,auth_password}" <$f)
+                {uid,wiki,repo_name,clone_addr,description,mirror,lfs,private,auth_token,auth_username,auth_password}" <$f)
             echo "Migrating repo" $(jq ".[$i] | .uid=${uid} | .name" <$f)
             echo $mig_data | create_migration_repo
         done
@@ -216,11 +219,14 @@ one_repo_to_migration() {
             if(.visibility==\"private\") then .private=true else .private=false end |\
             if(.visibility==\"private\") then .auth_username=\"${github_user}\" else . end | \
             if(.visibility==\"private\") then .auth_password=\"${GITHUB_TOKEN}\" else . end | \
+            .auth_token=\"${GITHUB_TOKEN}\" | \
+            .lfs=true | \
             .mirror=true | \
+            .wiki=true | \
             .clone_addr=.clone_url | \
             .description=.description[0:255] | \
             .repo_name=.name | \
-            {repo_owner,repo_name,clone_addr,description,mirror,private,auth_username,auth_password}" <$f)
+            {wiki,repo_owner,repo_name,clone_addr,description,mirror,lfs,private,auth_token,auth_username,auth_password}" <$f)
         echo "Migrating repo" $(jq ".name" <$f)
         echo $mig_data | create_migration_repo
     done
