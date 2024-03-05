@@ -163,7 +163,9 @@ create_migration_repo() {
     log "Create migration repo."
     if ! $CURL -w  "%{http_code}\n"  "${header_options[@]}" -d @- -X POST $GITEA_URL/api/v1/repos/migrate > ${jsonoutput}/result.txt 2>${jsonoutput}/stderr.txt; then
         local code=$(<${jsonoutput}/result.txt)
-        if (( code != 409 ));then # 409 == repo already exits
+        if (( code == 409 ));then # 409 == repo already exits
+            log "409: Gitea repo already exists. Skipping migration."
+        else
             cat ${jsonoutput}/stderr.txt >&2
         fi
     fi
@@ -175,7 +177,9 @@ create_migration_orga() {
     log "Create migration orga with name: ${gitea_organization}"
     if ! $CURL -X POST $GITEA_URL/api/v1/orgs "${header_options[@]}" --data '{"username": "'"${gitea_organization}"'", "visibility": "'"${visibility}"'"}' > ${jsonoutput}/result.txt 2>${jsonoutput}/stderr.txt; then
         local code=$(<${jsonoutput}/result.txt)
-        if (( code != 422 ));then # 422 == orga already exits
+        if (( code == 422 ));then # 422 == orga already exits
+            log "422: Gitea orga already exists. Skipping creation."
+        else
             cat ${jsonoutput}/stderr.txt >&2
         fi
     fi
