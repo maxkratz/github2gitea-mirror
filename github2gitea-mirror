@@ -35,7 +35,7 @@ fi
 
 # Parse input arguments
 if [[ -z "$1" ]]; then
-	log "No parameter(s) given. Exit."
+	echo -e "No parameter(s) given. Exit."
     exit 1
 fi
 while [[ "$#" -gt 0 ]]; do
@@ -45,7 +45,7 @@ while [[ "$#" -gt 0 ]]; do
         -u|--user) github_user="$2"; shift ;;
         -v|--visibility) visibility="$2"; shift ;;
         -r|--repo) repo="$2"; shift ;;
-		*) log "Unknown parameter passed: $1"; exit 1 ;;
+		*) echo -e "Unknown parameter passed: $1"; exit 1 ;;
 	esac
 	shift
 done
@@ -114,7 +114,26 @@ set_uid() {
 
 # Sets the uid to the specified Gitea user
 set_uid_user() {
-    uid=$($CURL "${header_options[@]}" $GITEA_URL/api/v1/users/${github_user} | jq .id)
+    if $CURL "${header_options[@]}" $GITEA_URL/api/v1/users/${github_user} >${jsonoutput}/result.txt ; then
+        uid=$(jq .id <${jsonoutput}/result.txt)
+    else
+        if [[ $(jq <${jsonoutput}/result.txt '. | length') -eq 0 ]] ; then
+            log "Gitea user not found. Creating user."
+            if [[ -z "${visibility}" ]]; then
+                echo -e "Visibility not set."
+                exit 1
+            fi
+            create_migration_user ${visibility}
+            if $CURL "${header_options[@]}" $GITEA_URL/api/v1/users/${github_user} >${jsonoutput}/result.txt ; then
+                uid=$(jq .id <${jsonoutput}/result.txt)
+            else
+                echo -e "Failed to get Gitea user after attempted creation. Exiting."
+                exit 1
+            fi
+        else
+            exit 1
+        fi
+    fi
 }
 
 # Fetches all starred repos of the given user to JSON files
@@ -142,9 +161,21 @@ fetch_orga_repos() {
 # Fetches all public/private repos of the given GitHub user to JSON files
 fetch_user_repos() {
     log "Fetch user repos."
+    $CURL "https://api.github.com/user" -u "${github_user}:${GITHUB_TOKEN}" >${jsonoutput}/user.txt
+    if (( $(jq <${jsonoutput}/user.txt '. | length') == 0 ))
+    then
+        echo -e "Empty response or 404 from GitHub. Exiting."
+        exit 1
+    else
+        if  [[ $(jq <${jsonoutput}/user.txt '.login') == "\"${github_user}\"" ]] ; then
+            local url_segment="user"
+        else
+            local url_segment="users/${github_user}"
+        fi
+    fi
     i=1
     # GitHub API just returns empty arrays instead of 404
-    while $CURL "https://api.github.com/user/repos?affiliation=owner&page=${i}&per_page=100" -u "${github_user}:${GITHUB_TOKEN}" >${jsonoutput}/${i}.json \
+    while $CURL "https://api.github.com/${url_segment}/repos?affiliation=owner&page=${i}&per_page=100" -u "${github_user}:${GITHUB_TOKEN}" >${jsonoutput}/${i}.json \
 	    && (( $(jq <${jsonoutput}/${i}.json '. | length') > 0 )) ; do
 	    (( i++ ))
     done
@@ -167,6 +198,23 @@ create_migration_repo() {
             log "409: Gitea repo already exists. Skipping migration."
         else
             cat ${jsonoutput}/stderr.txt >&2
+            exit 1
+        fi
+    fi
+}
+
+# Creates a specific public/private user on Gitea
+create_migration_user() {
+    visibility="${1:-}"
+    log "Create migration user with name: ${github_user}"
+    local password=$(tr -dc 'A-Za-z0-9!@#$%^&*()_+\-=[]{}\|;:,.<>/`~' < /dev/urandom | head -c 64)
+    if ! $CURL -X POST $GITEA_URL/api/v1/admin/users "${header_options[@]}" --data '{"username": "'"${github_user}"'", "visibility": "'"${visibility}"'", "email": "'"${github_user}@example.com"'", "password": "'"${password}"'", "must_change_password": true}' > ${jsonoutput}/result.txt 2>${jsonoutput}/stderr.txt; then
+        local code=$(<${jsonoutput}/result.txt)
+        if (( code == 422 ));then # 422 == user already exits
+            log "422: Gitea user already exists. Skipping creation."
+        else
+            cat ${jsonoutput}/stderr.txt >&2
+            exit 1
         fi
     fi
 }
@@ -181,6 +229,7 @@ create_migration_orga() {
             log "422: Gitea orga already exists. Skipping creation."
         else
             cat ${jsonoutput}/stderr.txt >&2
+            exit 1
         fi
     fi
 }
