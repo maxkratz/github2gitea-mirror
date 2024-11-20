@@ -37,10 +37,10 @@ There are four modes of operation, which the script can print out to the console
 ./github2gitea-mirror -m
 
 Usage: ./github2gitea-mirror
-   -m, --mode {org,star,repo,user}     Mode to use; either mirror an organization or mirror all starred repositories.
+   -m, --mode {org,star,repo,user}     Mode to use; mirror an organization, mirror all starred repositories, mirror a single repo, or mirror a user.
    -o, --org $organization             GitHub organization to mirror and/or the target organization in Gitea.
-   -u, --user $github_user             GitHub user to gather the starred repositories from.
-   -v, --visibility {public,private}   Visibility for the created Gitea organization.
+   -u, --user $github_user             GitHub user to gather repositories from.
+   -v, --visibility {public,private}   Visibility for the created Gitea organization or user.
    -r, --repo $repo_url                GitHub URL of a single repo to create a mirror for.
 ```
 
@@ -48,7 +48,7 @@ Usage: ./github2gitea-mirror
   - `org`: Mirror a complete oranization with all its public/private repositories.
   - `star`: Mirror all starred repositories by user `$github_user`.
   - `repo`: Mirror a single (public or private) repository.
-  - `user`: Mirror a complete user with all its public/private repositories.
+  - `user`: Mirror a complete user `$github_user` with all its public/private repositories.
 
 #### Examples
 
@@ -67,9 +67,14 @@ Mirror a single GitHub repository:
 ./github2gitea-mirror -m repo https://github.com/maxkratz/github2gitea-mirror -u $myGitHubUser
 ```
 
-Mirror a complete GitHub user:
+Mirror your own complete GitHub user:
 ```bash
 ./github2gitea-mirror -m user -u $myGitHubUser
+```
+
+Mirror someone else's complete GitHub user:
+```bash
+./github2gitea-mirror -m user -v public -u $someGitHubUser
 ```
 
 #### TODOs
