@@ -200,7 +200,8 @@ repos_to_migration() {
                 .clone_addr=.clone_url | \
                 .description=.description[0:255] | \
                 .repo_name=.name | \
-                {uid,repo_name,clone_addr,description,mirror,private,auth_username,auth_password}" <$f)
+                .lfs=true | \
+                {uid,repo_name,clone_addr,description,mirror,private,auth_username,auth_password,lfs}" <$f)
             echo "Migrating repo" $(jq ".[$i] | .uid=${uid} | .name" <$f)
             echo $mig_data | create_migration_repo
         done
