@@ -15,7 +15,7 @@
 
 # ENVs:
 #   ACCESS_TOKEN = Gitea token
-#   GITERA_URL   = Gitea URL
+#   GITEA_URL    = Gitea URL
 #   GITHUB_TOKEN = GitHub personal access token
 
 # Displays the given input including "=> " on the console.
@@ -100,7 +100,8 @@ fi
 
 # TODO:
 #set -euo pipefail
-set -eu pipefail
+#set -eu pipefail
+set -e pipefail
 
 header_options=(-H  "Authorization: Bearer ${ACCESS_TOKEN}" -H "accept: application/json" -H "Content-Type: application/json")
 jsonoutput=$(mktemp -d -t github-repos-XXXXXXXX)
@@ -144,7 +145,7 @@ fetch_user_repos() {
     log "Fetch user repos."
     i=1
     # GitHub API just returns empty arrays instead of 404
-    while $CURL "https://api.github.com/user/repos?affiliation=owner&page=${i}&per_page=100" -u "${github_user}:${GITHUB_TOKEN}" >${jsonoutput}/${i}.json \
+    while $CURL "https://api.github.com/users/${github_user}/repos?page=${i}&per_page=100" -u "${github_user}:${GITHUB_TOKEN}" >${jsonoutput}/${i}.json \
 	    && (( $(jq <${jsonoutput}/${i}.json '. | length') > 0 )) ; do
 	    (( i++ ))
     done
@@ -244,7 +245,16 @@ elif [ "${mode}" == "star" ]; then
     repos_to_migration
 elif [ "${mode}" == "user" ]; then
     log "Mode = user"
-    set_uid_user
+
+    if [[ -z "${gitea_organization}" ]]; then
+        log "Output = user"
+        set_uid_user
+    else
+        log "Output = organization"
+        create_migration_orga ${visibility}
+        set_uid
+    fi
+
     fetch_user_repos
     repos_to_migration
 fi
