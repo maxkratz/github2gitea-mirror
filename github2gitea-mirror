@@ -140,8 +140,19 @@ fetch_orga_repos() {
     done
 }
 
-# Fetches all public/private repos of the given GitHub user to JSON files
-fetch_user_repos() {
+# Fetches public/private (owned) repos of the given GitHub user to JSON files
+fetch_user_repos_owner() {
+    log "Fetch user repos."
+    i=1
+    # GitHub API just returns empty arrays instead of 404
+    while $CURL "https://api.github.com/user/repos?affiliation=owner&page=${i}&per_page=100" -u "${github_user}:${GITHUB_TOKEN}" >${jsonoutput}/${i}.json \
+	    && (( $(jq <${jsonoutput}/${i}.json '. | length') > 0 )) ; do
+	    (( i++ ))
+    done
+}
+
+# Fetches (all) public/private repos of the given GitHub user (including non-owning repositories) to JSON files
+fetch_user_repos_all() {
     log "Fetch user repos."
     i=1
     # GitHub API just returns empty arrays instead of 404
@@ -249,13 +260,14 @@ elif [ "${mode}" == "user" ]; then
     if [[ -z "${gitea_organization}" ]]; then
         log "Output = user"
         set_uid_user
+        fetch_user_repos_owner
     else
         log "Output = organization"
         create_migration_orga ${visibility}
         set_uid
+        fetch_user_repos_all
     fi
 
-    fetch_user_repos
     repos_to_migration
 fi
 
