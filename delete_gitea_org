@@ -66,7 +66,10 @@ fetch_orga_repos() {
     log "Fetch organization repos."
     if ! $CURL -X GET $GITEA_URL/api/v1/orgs/${gitea_organization}/repos "${header_options[@]}" >${jsonoutput}/1.json 2>${jsonoutput}/stderr.txt; then
         local code=$(<${jsonoutput}/result.txt)
-        if (( code != 404 ));then # 404 == orga not found
+        if (( code == 404 ));then # 404 == orga not found
+            log "404: Gitea orga not found. Nothing to do. Exiting."
+            exit 1
+        else
             cat ${jsonoutput}/stderr.txt >&2
         fi
     fi
@@ -95,7 +98,9 @@ delete_orga() {
     log "Delete orga."
     if ! $CURL -X DELETE $GITEA_URL/api/v1/orgs/${gitea_organization} "${header_options[@]}" > ${jsonoutput}/result.txt 2>${jsonoutput}/stderr.txt; then
         local code=$(<${jsonoutput}/result.txt)
-        if (( code != 404 ));then # 404 == orga not found
+        if (( code == 404 ));then # 404 == orga not found
+            log "404: Gitea orga not found. Is it already deleted?"
+        else
             cat ${jsonoutput}/stderr.txt >&2
         fi
     fi
